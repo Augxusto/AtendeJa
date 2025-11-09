@@ -21,3 +21,6 @@ O sistema busca reduzir filas, diminuir o tempo de espera e evitar aglomeraçõe
 - <a href="https://github.com/Augxusto">Rodrigo Augusto da Silva</a>  
 - <a href="https://github.com/Kas2205">José Antônio Kassius Floriani Lima</a>  
 - <a href="https://github.com/Guilherme-Prad0">Guilherme Bueno do Prado</a>  
+
+---
+Desenvolvido como parte da AEP 4º Semestre - UniCesumar.
