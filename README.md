@@ -18,6 +18,6 @@ O sistema busca reduzir filas, diminuir o tempo de espera e evitar aglomeraçõe
 - Otimização do uso da capacidade das UPAs.
 
 ## 👨‍💻 Equipe de Desenvolvimento  
-- <a href="https://github.com/rodrigoaugusto">Rodrigo Augusto da Silva</a>  
+- <a href="https://github.com/Augxusto">Rodrigo Augusto da Silva</a>  
 - <a href="https://github.com/Kas2205">José Antônio Kassius Floriani Lima</a>  
 - <a href="https://github.com/Guilherme-Prad0">Guilherme Bueno do Prado</a>  
