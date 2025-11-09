@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal do Paciente - UPA Digital</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: linear-gradient(to right, #f0f4f8, #d9e2ec); margin: 0; padding: 0; }
+        .container { max-width: 950px; margin: 40px auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        h1, h2 { text-align: center; color: #2c3e50; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; border-radius: 6px; overflow: hidden; }
+        th, td { padding: 12px; text-align: left; border: 1px solid #aaa; }
+        th { background-color: #3498db; color: white; }
+        tr:nth-child(even) { background-color: #ecf0f1; }
+        .btn { display: inline-block; margin: 6px; padding: 10px 18px; background-color: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn:hover { background-color: #2980b9; }
+        input, select { padding: 8px; margin: 5px 0; width: 250px; border-radius: 4px; border: 1px solid #ccc; }
+        #mainContent { margin-top: 25px; }
+        .checkbox-group { margin: 10px 0; }
+        .critico { color: white; background-color: #e74c3c; padding: 2px 6px; border-radius: 3px; font-weight: bold; }
+        .moderado { color: white; background-color: #f1c40f; padding: 2px 6px; border-radius: 3px; font-weight: bold; }
+        .leve { color: white; background-color: #2ecc71; padding: 2px 6px; border-radius: 3px; font-weight: bold; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Portal do Paciente - UPA Digital</h1>
+    <div style="text-align:center;">
+        <button class="btn" onclick="mostrarUPAsDisponiveis()">Ver UPAs Disponíveis</button>
+        <button class="btn" onclick="startAdicionarPaciente()">Cadastrar / Pegar Ticket</button>
+        <button class="btn" onclick="mostrarPainelPaciente()">Meu Painel</button>
+        <button class="btn" onclick="mostrarFormCancelar()">Cancelar Atendimento</button>
+    </div>
+
+    <div id="mainContent"></div>
+</div>
+
+<script>
+    // --- Dados iniciais ---
+    let upas = [
+      {id:1, nome:'UPA Centro', latitude:-23.4200, longitude:-51.9350},
+      {id:2, nome:'UPA Norte', latitude:-23.3900, longitude:-51.9300},
+      {id:3, nome:'UPA Sul', latitude:-23.4500, longitude:-51.9400},
+      {id:4, nome:'UPA Leste', latitude:-23.4200, longitude:-51.9100},
+      {id:5, nome:'UPA Oeste', latitude:-23.4200, longitude:-51.9600},
+    ];
+
+    let pacientes = [
+      {cpf:'11111111111', nome:'João Silva', criticidade:3, sintomas:'Dores no peito', upaId:1},
+      {cpf:'22222222222', nome:'Maria Souza', criticidade:2, sintomas:'Febre e tosse', upaId:2},
+      {cpf:'33333333333', nome:'Carlos Lima', criticidade:1, sintomas:'Gripe leve', upaId:3},
+      {cpf:'44444444444', nome:'Ana Costa', criticidade:2, sintomas:'Dores abdominais', upaId:4},
+      {cpf:'55555555555', nome:'Pedro Alves', criticidade:3, sintomas:'Fratura no braço', upaId:5},
+      {cpf:'66666666666', nome:'Fernanda Melo', criticidade:3, sintomas:'Perda de consciência', upaId:1},
+      {cpf:'77777777777', nome:'Lucas Pinto', criticidade:2, sintomas:'Febre persistente', upaId:1},
+      {cpf:'88888888888', nome:'Carla Dias', criticidade:1, sintomas:'Gripe forte', upaId:2},
+      {cpf:'99999999999', nome:'Renato Gomes', criticidade:2, sintomas:'Dor abdominal', upaId:3},
+    ];
+
+    let tickets = [];
+    let ticketCounter = 1;
+
+    // --- Persistência ---
+    function salvarDados() {
+        localStorage.setItem('pacientes', JSON.stringify(pacientes));
+        localStorage.setItem('tickets', JSON.stringify(tickets));
+    }
+
+    function carregarDados() {
+        let dadosPacientes = localStorage.getItem('pacientes');
+        let dadosTickets = localStorage.getItem('tickets');
+        if(dadosPacientes) pacientes = JSON.parse(dadosPacientes);
+        if(dadosTickets) tickets = JSON.parse(dadosTickets);
+        if(tickets.length) ticketCounter = Math.max(...tickets.map(t=>t.ticketNum))+1;
+    }
+
+    carregarDados();
+
+    // --- Tickets e fila ---
+    function gerarTicket(cpf, upaId){
+      let posicao = tickets.filter(t => t.upaId===upaId).length + 1;
+      tickets.push({ticketNum:ticketCounter++, cpf, upaId, posicao, tempoEspera:0});
+      atualizarFila(upaId);
+      salvarDados();
+      return ticketCounter-1;
+    }
+
+    function atualizarFila(upaId){
+      let fila = pacientes.filter(p=>p.upaId===upaId)
+        .sort((a,b)=>{
+            let cmp = b.criticidade - a.criticidade;
+            if(cmp!==0) return cmp;
+            let tA = tickets.find(tt=>tt.cpf===a.cpf).ticketNum;
+            let tB = tickets.find(tt=>tt.cpf===b.cpf).ticketNum;
+            return tA - tB;
+        });
+      let tempoAcumulado = 0;
+      fila.forEach((p,i)=>{
+        let ticket = tickets.find(t=>t.cpf===p.cpf);
+        ticket.posicao = i+1;
+        let tempoAtual = p.criticidade===3 ? 15 : p.criticidade===2 ? 10 : 5;
+        ticket.tempoEspera = tempoAcumulado;
+        tempoAcumulado += tempoAtual;
+      });
+    }
+
+    function getCriticidadeClass(criticidade){
+      if(criticidade===3) return "critico";
+      if(criticidade===2) return "moderado";
+      return "leve";
+    }
+
+    // --- UPAs Disponíveis ---
+    function calcularTempoEsperaProximoPaciente(upaId){
+      let fila = tickets.filter(t=>t.upaId===upaId);
+      return fila.reduce((acc,t)=>acc + (pacientes.find(p=>p.cpf===t.cpf).criticidade===3 ? 15 : pacientes.find(p=>p.cpf===t.cpf).criticidade===2 ? 10 : 5),0);
+    }
+
+    function mostrarUPAsDisponiveis(){
+      let html = `<h2>UPAs Disponíveis</h2><table><thead><tr><th>UPA</th><th>Tempo Estimado (min)</th><th>Pacientes na fila</th></tr></thead><tbody>`;
+      let ordenadas = [...upas].sort((a,b)=>calcularTempoEsperaProximoPaciente(a.id)-calcularTempoEsperaProximoPaciente(b.id));
+      ordenadas.forEach(u=>{
+        let tempo = calcularTempoEsperaProximoPaciente(u.id);
+        let qtdFila = tickets.filter(t=>t.upaId===u.id).length;
+        html += `<tr><td>${u.nome}</td><td>${tempo}</td><td>${qtdFila}</td></tr>`;
+      });
+      html += `</tbody></table>`;
+      document.getElementById('mainContent').innerHTML = html;
+    }
+
+    // --- Cadastro ---
+    function startAdicionarPaciente(){
+      document.getElementById('mainContent').innerHTML = `<h2>Consentimento LGPD</h2>
+        <p>Seus dados serão usados apenas para gestão de atendimento.</p>
+        <button class="btn" onclick="consentimento('s')">Sim</button>
+        <button class="btn" onclick="consentimento('n')">Não</button>`;
+    }
+
+    function consentimento(valor){
+      if(valor==='n'){ alert("Sem consentimento, cadastro cancelado."); return; }
+      document.getElementById('mainContent').innerHTML = `
+        <h2>Cadastrar Paciente</h2>
+        <label>Nome:</label><br><input type="text" id="nomePaciente"><br>
+        <label>CPF (11 números):</label><br><input type="text" id="cpfPaciente" maxlength="11"><br>
+        <label>Região do Paciente:</label><br>
+        <select id="regiaoPaciente" onchange="atualizarOpcoesUPA()">
+          <option value="1">Norte</option>
+          <option value="2">Sul</option>
+          <option value="3">Leste</option>
+          <option value="4">Oeste</option>
+        </select><br><br>
+        <div class="checkbox-group">
+          <label>Selecione os sintomas críticos (marque mais de um se necessário):</label><br>
+          <input type="checkbox" class="sintomaCrit" data-crit="3"> Dor intensa no peito<br>
+          <input type="checkbox" class="sintomaCrit" data-crit="3"> Dificuldade para respirar<br>
+          <input type="checkbox" class="sintomaCrit" data-crit="3"> Perda de consciência ou tontura intensa<br>
+          <input type="checkbox" class="sintomaCrit" data-crit="3"> Sangramento abundante<br>
+          <input type="checkbox" class="sintomaCrit" data-crit="2"> Febre alta ou persistente<br>
+          <input type="checkbox" class="sintomaCrit" data-crit="2"> Desmaios recentes ou convulsões<br>
+          <input type="checkbox" class="sintomaCrit" data-crit="2"> Dor abdominal intensa ou persistente<br>
+        </div>
+        <label>Sintomas adicionais (obrigatório):</label><br><input type="text" id="sintomasPaciente"><br><br>
+        <div id="opcoesUPA"></div>
+        <button class="btn" onclick="finalizarCadastro()">Finalizar Cadastro</button>
+      `;
+      atualizarOpcoesUPA();
+    }
+
+    function coordenadasPorRegiao(regiao){
+      switch(regiao){
+        case 1: return [-23.39, -51.94];
+        case 2: return [-23.44, -51.94];
+        case 3: return [-23.43, -51.91];
+        case 4: return [-23.42, -51.96];
+        default: return [-23.42, -51.93];
+      }
+    }
+
+    function atualizarOpcoesUPA(){
+      let regiao = parseInt(document.getElementById('regiaoPaciente').value);
+      let coords = coordenadasPorRegiao(regiao);
+      let opcoes = upas.map(u=> ({...u, distancia: Math.hypot(u.latitude-coords[0], u.longitude-coords[1])}));
+      let upaProxima = opcoes.reduce((a,b)=>a.distancia<b.distancia?a:b);
+      let outras = opcoes.filter(u=>u.id!==upaProxima.id)
+        .sort((a,b)=>calcularTempoEsperaProximoPaciente(a.id)-calcularTempoEsperaProximoPaciente(b.id))
+        .slice(0,2);
+      let exibidas = [upaProxima,...outras];
+      let html = "<label>Escolha a UPA:</label><br>";
+      exibidas.forEach((u,i)=>{
+        html += `<input type="radio" name="upaSelecionada" value="${u.id}" ${i===0?"checked":""}> ${u.nome} | Tempo estimado: ${calcularTempoEsperaProximoPaciente(u.id)} min<br>`;
+      });
+      document.getElementById('opcoesUPA').innerHTML = html;
+    }
+
+    function finalizarCadastro(){
+  let nome = document.getElementById('nomePaciente').value.trim();
+  let cpf = document.getElementById('cpfPaciente').value.trim();
+  let sintomasAdicionais = document.getElementById('sintomasPaciente').value.trim();
+  let sintomasCriticos = Array.from(document.querySelectorAll('.sintomaCrit:checked'));
+  let criticidade = 1;
+  sintomasCriticos.forEach(s => {
+    let crit = parseInt(s.getAttribute('data-crit'));
+    if(crit>criticidade) criticidade=crit;
+  });
+
+  if(!nome || !cpf.match(/^\d{11}$/)){ alert("Informe nome e CPF válidos."); return; }
+  if(!sintomasAdicionais){ alert("Informe ao menos um sintoma adicional."); return; }
+  if(pacientes.some(p=>p.cpf===cpf)){ alert("Paciente já cadastrado!"); return; }
+
+  let upaId = parseInt(document.querySelector('input[name="upaSelecionada"]:checked').value);
+  pacientes.push({cpf,nome,criticidade,sintomas:sintomasAdicionais,upaId});
+  let ticketNum = gerarTicket(cpf,upaId);
+
+  let upa = upas.find(u => u.id === upaId); // Buscar o nome da UPA
+
+  alert(`Cadastro realizado com sucesso!\nUPA: ${upa ? upa.nome : upaId}\nTicket: #${ticketNum}`);
+
+  mostrarUPAsDisponiveis();
+}
+
+    // --- Painel do paciente ---
+    function mostrarPainelPaciente(){
+      document.getElementById('mainContent').innerHTML = `
+        <h2>Meu Painel</h2>
+        <label>Digite seu CPF:</label><br>
+        <input type="text" id="cpfPainel" maxlength="11"><br><br>
+        <button class="btn" onclick="acessarPainel()">Acessar Painel</button>
+      `;
+    }
+
+   function acessarPainel(){
+  let cpf = document.getElementById('cpfPainel').value.trim();
+  let pac = pacientes.find(p=>p.cpf===cpf);
+  if(!pac){ alert("CPF não encontrado!"); return; }
+
+  let ticket = tickets.find(t=>t.cpf===cpf);
+  if(!ticket){
+    document.getElementById('mainContent').innerHTML = `<p>Você não possui ticket ativo.</p>`;
+    return;
+  }
+
+  let upa = upas.find(u => u.id === pac.upaId); // Busca o nome da UPA
+  let classeCrit = getCriticidadeClass(pac.criticidade);
+
+  document.getElementById('mainContent').innerHTML = `
+    <h2>Meu Painel</h2>
+    <p><strong>Nome:</strong> ${pac.nome}</p>
+    <p><strong>UPA:</strong> ${upa ? upa.nome : "Desconhecida"}</p>
+    <p><strong>Ticket:</strong> #${ticket.ticketNum}</p>
+    <p><strong>Posição na fila:</strong> <span class="${classeCrit}">${ticket.posicao}</span></p>
+    <p><strong>Tempo estimado de espera:</strong> ${ticket.tempoEspera} minutos</p>
+    <br>
+    <button class="btn" onclick="mostrarUPAsDisponiveis()">Ver UPAs</button>
+    <button class="btn" onclick="mostrarFormCancelar()">Cancelar Atendimento</button>
+  `;
+}
+
+    // --- Cancelamento ---
+    function mostrarFormCancelar(){
+      document.getElementById('mainContent').innerHTML = `<h2>Cancelar Atendimento</h2>
+        <label>Digite o CPF:</label><br>
+        <input type="text" id="cpfCancel" maxlength="11"><br><br>
+        <button class="btn" onclick="cancelarConsulta()">Cancelar</button>`;
+    }
+
+    function cancelarConsulta(){
+      let cpf = document.getElementById('cpfCancel').value.trim();
+      let pacIndex = pacientes.findIndex(p=>p.cpf===cpf);
+      if(pacIndex===-1){ alert("Paciente não encontrado!"); return; }
+      let upaId = pacientes[pacIndex].upaId;
+      pacientes.splice(pacIndex,1);
+      tickets = tickets.filter(t=>t.cpf!==cpf);
+      atualizarFila(upaId);
+      salvarDados();
+      alert("Atendimento cancelado com sucesso!");
+      mostrarUPAsDisponiveis();
+    }
+
+    mostrarUPAsDisponiveis();
+</script>
+</body>
+</html>
